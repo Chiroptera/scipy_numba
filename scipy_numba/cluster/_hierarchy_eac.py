@@ -8,8 +8,8 @@ import numpy as np
 
 import numba as nb
 
-from . import _hierarchy_distance_update as hdu
-from ._argsort import argsort1D as argsort
+import _hierarchy_distance_update as hdu
+from _argsort import argsort1D as argsort
 
 linkage_methods = {'single': hdu._single,
                    'complete': hdu._complete,
@@ -20,11 +20,13 @@ linkage_methods = {'single': hdu._single,
                    'weighted': hdu._weighted}
 
 
-myint = nb.int32
-myfloat = nb.float32
+np_myint = np.int32
+np_myfloat = np.float32
+nb_myint = nb.int32
+nb_myfloat = nb.float32
 
     
-@nb.njit(myint(myint, myint, myint))
+@nb.njit
 def condensed_index(n, i, j):
     """
     Calculate the condensed index of element (i, j) in an n x n condensed
@@ -40,7 +42,7 @@ def condensed_index(n, i, j):
         return 0
 
 
-@nb.njit(myint(nb.uint8[:], myint))
+@nb.njit
 def is_visited(bitset, i):
     """
     Check if node i was visited.
@@ -48,7 +50,7 @@ def is_visited(bitset, i):
     return bitset[i >> 3] & (1 << (i & 7))
 
 
-@nb.njit(nb.void(nb.uint8[:], myint))
+@nb.njit
 def set_visited(bitset, i):
     """
     Mark node i as visited.
@@ -56,7 +58,7 @@ def set_visited(bitset, i):
     bitset[i >> 3] |= 1 << (i & 7)
 
 
-@nb.njit(nb.void(myfloat[:, :], myfloat[:], myint))
+@nb.njit
 def get_max_dist_for_each_cluster(Z, MD, n):
     """
     Get the maximum inconsistency coefficient for each non-singleton cluster.
@@ -70,9 +72,9 @@ def get_max_dist_for_each_cluster(Z, MD, n):
     n : int
         The number of observations.
     """
-    curr_node = np.empty(n, dtype=myint)
+    curr_node = np.empty(n, dtype=nb_myint)
 
-    visited_size = np.int((((n * 2) - 1) >> 3) + 1)
+    visited_size = np_myint((((n * 2) - 1) >> 3) + 1)
 
     visited = np.zeros(visited_size, dtype=np.uint8)
 
@@ -80,8 +82,8 @@ def get_max_dist_for_each_cluster(Z, MD, n):
     curr_node[0] = 2 * n - 2
     while k >= 0:
         root = curr_node[k] - n
-        i_lc = np.int(Z[root, 0])
-        i_rc = np.int(Z[root, 1])
+        i_lc = np_myint(Z[root, 0])
+        i_rc = np_myint(Z[root, 1])
 
         if i_lc >= n and not is_visited(visited, i_lc):
             set_visited(visited, i_lc)
@@ -110,7 +112,7 @@ def get_max_dist_for_each_cluster(Z, MD, n):
 
 
 
-@nb.njit(nb.void(myfloat[:, :], myfloat[:, :], myfloat[:], myint, myint))
+@nb.njit
 def get_max_Rfield_for_each_cluster(Z, R, max_rfs, n, rf):
     """
     Get the maximum statistic for each non-singleton cluster. For the i'th
@@ -130,9 +132,9 @@ def get_max_Rfield_for_each_cluster(Z, R, max_rfs, n, rf):
         Indicate which column of `R` is used.
     """
 
-    curr_node = np.empty(n, dtype=myint)
+    curr_node = np.empty(n, dtype=nb_myint)
 
-    visited_size = np.int((((n * 2) - 1) >> 3) + 1)
+    visited_size = np_myint((((n * 2) - 1) >> 3) + 1)
 
     visited = np.zeros(visited_size, dtype=np.uint8)
 
@@ -140,8 +142,8 @@ def get_max_Rfield_for_each_cluster(Z, R, max_rfs, n, rf):
     curr_node[0] = 2 * n - 2
     while k >= 0:
         root = curr_node[k] - n
-        i_lc = np.int(Z[root, 0])
-        i_rc = np.int(Z[root, 1])
+        i_lc = np_myint(Z[root, 0])
+        i_rc = np_myint(Z[root, 1])
 
         if i_lc >= n and not is_visited(visited, i_lc):
             set_visited(visited, i_lc)
@@ -169,7 +171,7 @@ def get_max_Rfield_for_each_cluster(Z, R, max_rfs, n, rf):
         k -= 1
 
 
-@nb.njit(nb.void(myfloat[:, :], myfloat[:], myint[:], myfloat, myint))
+@nb.njit
 def cluster_monocrit(Z, MC, T, cutoff, n):
     """
     Form flat clusters by monocrit criterion.
@@ -192,9 +194,9 @@ def cluster_monocrit(Z, MC, T, cutoff, n):
 
     n_cluster = 0
     cluster_leader = -1
-    curr_node = np.empty(n, dtype=myint)
+    curr_node = np.empty(n, dtype=nb_myint)
 
-    visited_size = np.int((((n * 2) - 1) >> 3) + 1)
+    visited_size = np_myint((((n * 2) - 1) >> 3) + 1)
 
     visited = np.zeros(visited_size, dtype=np.uint8)
 
@@ -202,8 +204,8 @@ def cluster_monocrit(Z, MC, T, cutoff, n):
     curr_node[0] = 2 * n - 2
     while k >= 0:
         root = curr_node[k] - n
-        i_lc = np.int(Z[root, 0])
-        i_rc = np.int(Z[root, 1])
+        i_lc = np_myint(Z[root, 0])
+        i_rc = np_myint(Z[root, 1])
 
         if cluster_leader == -1 and MC[root] <= cutoff:  # found a cluster
             cluster_leader = root
@@ -236,7 +238,7 @@ def cluster_monocrit(Z, MC, T, cutoff, n):
         k -= 1
 
 
-@nb.njit(nb.void(myfloat[:, :], myfloat[:], myint[:], myint, myint))
+@nb.njit
 def cluster_maxclust_monocrit(Z, MC, T, n, max_nc):
     """
     Form flat clusters by maxclust_monocrit criterion.
@@ -256,9 +258,9 @@ def cluster_maxclust_monocrit(Z, MC, T, n, max_nc):
         The maximum number of clusters.
     """
 
-    curr_node = np.empty(n, dtype=myint)
+    curr_node = np.empty(n, dtype=nb_myint)
 
-    visited_size = np.int((((n * 2) - 1) >> 3) + 1)
+    visited_size = np_myint((((n * 2) - 1) >> 3) + 1)
 
     visited = np.empty(visited_size, dtype=np.uint8)
 
@@ -279,8 +281,8 @@ def cluster_maxclust_monocrit(Z, MC, T, n, max_nc):
 
         while k >= 0:
             root = curr_node[k] - n
-            i_lc = np.int(Z[root, 0])
-            i_rc = np.int(Z[root, 1])
+            i_lc = np_myint(Z[root, 0])
+            i_rc = np_myint(Z[root, 1])
 
             if MC[root] <= thresh:  # this subtree forms a cluster
                 nc += 1
@@ -323,7 +325,7 @@ def cluster_maxclust_monocrit(Z, MC, T, n, max_nc):
     cluster_monocrit(Z, MC, T, MC[upper_idx], n)
 
 
-@nb.njit(nb.void(myfloat[:, :], myfloat[:], myint))
+@nb.njit
 def calculate_cluster_sizes(Z, cs, n):
     """
     Calculate the size of each cluster. The result is the fourth column of
@@ -340,8 +342,8 @@ def calculate_cluster_sizes(Z, cs, n):
     """
 
     for i in range(n - 1):
-        child_l = np.int(Z[i, 0])
-        child_r = np.int(Z[i, 1])
+        child_l = np_myint(Z[i, 0])
+        child_r = np_myint(Z[i, 1])
 
         if child_l >= n:
             cs[i] += cs[child_l - n]
@@ -354,7 +356,7 @@ def calculate_cluster_sizes(Z, cs, n):
             cs[i] += 1
 
 
-@nb.njit(nb.void(myfloat[:, :], myint[:], myfloat, myint))
+@nb.njit
 def cluster_dist(Z, T, cutoff, n):
     """
     Form flat clusters by distance criterion.
@@ -371,12 +373,12 @@ def cluster_dist(Z, T, cutoff, n):
     n : int
         The number of observations.
     """
-    max_dists = np.empty(n, dtype=np.double)
+    max_dists = np.empty(n, dtype=np_myfloat)
     get_max_dist_for_each_cluster(Z, max_dists, n)
     cluster_monocrit(Z, max_dists, T, cutoff, n)
 
 
-@nb.njit(nb.void(myfloat[:, :], myfloat[:, :], myint[:], myfloat, myint))
+@nb.njit
 def cluster_in(Z, R, T, cutoff, n):
     """
     Form flat clusters by inconsistent criterion.
@@ -396,12 +398,12 @@ def cluster_in(Z, R, T, cutoff, n):
     n : int
         The number of observations.
     """
-    max_inconsists = np.empty(n, dtype=np.double)
+    max_inconsists = np.empty(n, dtype=np_myfloat)
     get_max_Rfield_for_each_cluster(Z, R, max_inconsists, n, 3)
     cluster_monocrit(Z, max_inconsists, T, cutoff, n)
 
 
-@nb.njit(nb.void(myfloat[:, :], myint[:], myint, myint))
+@nb.njit
 def cluster_maxclust_dist(Z, T, n, mc):
     """
     Form flat clusters by maxclust criterion.
@@ -418,13 +420,13 @@ def cluster_maxclust_dist(Z, T, n, mc):
     mc : int
         The maximum number of clusters.
     """
-    max_dists = np.empty(n, dtype=np.double)
+    max_dists = np.empty(n, dtype=np_myfloat)
     get_max_dist_for_each_cluster(Z, max_dists, n)
     # should use an O(n) algorithm
     cluster_maxclust_monocrit(Z, max_dists, T, n, mc)
 
 
-@nb.njit(nb.void(myfloat[:, :], myfloat[:], myint))
+@nb.njit
 def cophenetic_distances(Z, d, n):
     """
     Calculate the cophenetic distances between each observation
@@ -439,11 +441,11 @@ def cophenetic_distances(Z, d, n):
         The number of observations.
     """
 
-    curr_node = np.empty(n, dtype=myint)
-    members = np.empty(n, dtype=myint)
-    left_start = np.empty(n, dtype=myint)
+    curr_node = np.empty(n, dtype=nb_myint)
+    members = np.empty(n, dtype=nb_myint)
+    left_start = np.empty(n, dtype=nb_myint)
 
-    visited_size = np.int((((n * 2) - 1) >> 3) + 1)
+    visited_size = np_myint((((n * 2) - 1) >> 3) + 1)
 
     visited = np.zeros(visited_size, dtype=np.uint8)
 
@@ -452,11 +454,11 @@ def cophenetic_distances(Z, d, n):
     left_start[0] = 0
     while k >= 0:
         root = curr_node[k] - n
-        i_lc = np.int(Z[root, 0])
-        i_rc = np.int(Z[root, 1])
+        i_lc = np_myint(Z[root, 0])
+        i_rc = np_myint(Z[root, 1])
 
         if i_lc >= n:  # left child is not a leaf
-            n_lc = np.int(Z[i_lc - n, 3])
+            n_lc = np_myint(Z[i_lc - n, 3])
 
             if not is_visited(visited, i_lc):
                 set_visited(visited, i_lc)
@@ -469,7 +471,7 @@ def cophenetic_distances(Z, d, n):
             members[left_start[k]] = i_lc
 
         if i_rc >= n:  # right child is not a leaf
-            n_rc = np.int(Z[i_rc - n, 3])
+            n_rc = np_myint(Z[i_rc - n, 3])
 
             if not is_visited(visited, i_rc):
                 set_visited(visited, i_rc)
@@ -493,7 +495,7 @@ def cophenetic_distances(Z, d, n):
 
 
 
-@nb.njit(nb.void(myfloat[:, :], myfloat[:, :], myint, myint))
+@nb.njit
 def inconsistent(Z, R, n, d):
     """
     Calculate the inconsistency statistics.
@@ -517,9 +519,9 @@ def inconsistent(Z, R, n, d):
         The number of levels included in calculation below a node.
     """
 
-    curr_node = np.empty(n, dtype=myint)
+    curr_node = np.empty(n, dtype=nb_myint)
 
-    visited_size = np.int((((n * 2) - 1) >> 3) + 1)
+    visited_size = np_myint((((n * 2) - 1) >> 3) + 1)
 
     visited = np.empty(visited_size, dtype=np.uint8)
 
@@ -537,14 +539,14 @@ def inconsistent(Z, R, n, d):
             root = curr_node[k]
 
             if k < d - 1:
-                i_lc = np.int(Z[root, 0])
+                i_lc = np_myint(Z[root, 0])
                 if i_lc >= n and not is_visited(visited, i_lc):
                     set_visited(visited, i_lc)
                     k += 1
                     curr_node[k] = i_lc - n
                     continue
 
-                i_rc = np.int(Z[root, 1])
+                i_rc = np_myint(Z[root, 1])
                 if i_rc >= n and not is_visited(visited, i_rc):
                     set_visited(visited, i_rc)
                     k += 1
@@ -573,7 +575,7 @@ def inconsistent(Z, R, n, d):
             R[i, 1] = 0
 
 
-@nb.njit(myint(myfloat[:, :], myint[:], myint[:], myint[:], myint, myint))
+@nb.njit
 def leaders(Z, T, L, M, nc, n):
     """
     Find the leader (root) of each flat cluster.
@@ -602,10 +604,10 @@ def leaders(Z, T, L, M, nc, n):
         `-1` indicates success.
     """
     result = -1
-    curr_node = np.empty(n, dtype=myint)
-    cluster_ids = np.empty(n * 2 - 1, dtype=myint)
+    curr_node = np.empty(n, dtype=nb_myint)
+    cluster_ids = np.empty(n * 2 - 1, dtype=nb_myint)
 
-    visited_size = np.int((((n * 2) - 1) >> 3) + 1)
+    visited_size = np_myint((((n * 2) - 1) >> 3) + 1)
 
     visited = np.zeros(visited_size, dtype=np.uint8)
 
@@ -620,8 +622,8 @@ def leaders(Z, T, L, M, nc, n):
     leader_idx = 0
     while k >= 0:
         root = curr_node[k] - n
-        i_lc = np.int(Z[root, 0])
-        i_rc = np.int(Z[root, 1])
+        i_lc = np_myint(Z[root, 0])
+        i_rc = np_myint(Z[root, 1])
 
         if i_lc >= n and not is_visited(visited, i_lc):
             set_visited(visited, i_lc)
@@ -662,8 +664,8 @@ def leaders(Z, T, L, M, nc, n):
         k -= 1
 
     if result == -1:
-        i_lc = np.int(Z[n - 2, 0])
-        i_rc = np.int(Z[n - 2, 1])
+        i_lc = np_myint(Z[n - 2, 0])
+        i_rc = np_myint(Z[n - 2, 1])
         cid_lc = cluster_ids[i_lc]
         cid_rc = cluster_ids[i_rc]
         if cid_lc == cid_rc and cid_lc != -1:
@@ -676,7 +678,7 @@ def leaders(Z, T, L, M, nc, n):
     return result  # -1 means success here
 
 
-@nb.njit(nb.void(myfloat[:], myfloat[:, :], myint, myint))
+@nb.njit
 def linkage(dists, Z, n, method):
     """
     Perform hierarchy clustering.
@@ -695,9 +697,9 @@ def linkage(dists, Z, n, method):
     """
 
     # inter-cluster dists
-    D = np.empty(n * (n - 1) // 2, dtype=np.double)
+    D = np.empty(n * (n - 1) // 2, dtype=np_myfloat)
     # map the indices to node ids
-    id_map = np.empty(n, dtype=np.int64)
+    id_map = np.empty(n, dtype=np_myint64)
 
     for ndx in range(dists.shape[0]):
         D[ndx] = dists[ndx]
@@ -707,7 +709,7 @@ def linkage(dists, Z, n, method):
 
     for k in range(n - 1):
         # find two closest clusters x, y (x < y)
-        current_min = np.double(np.inf)
+        current_min = np_myfloat(np.inf)
         for i in range(n - 1):
             if id_map[i] == -1:
                 continue
@@ -723,16 +725,16 @@ def linkage(dists, Z, n, method):
         id_y = id_map[y]
 
         # get the original numbers of points in clusters x and y
-        nx = 1 if id_x < n else myint(Z[id_x - n, 3])
-        ny = 1 if id_y < n else myint(Z[id_y - n, 3])
+        nx = 1 if id_x < n else nb_myint(Z[id_x - n, 3])
+        ny = 1 if id_y < n else nb_myint(Z[id_y - n, 3])
 
         # record the new node
         if id_x < id_y:
-            Z[k, 0], Z[k, 1], Z[k, 2], Z[k, 3] = (np.double(id_x), np.double(id_y),
-                                                  current_min, np.double(nx + ny))
+            Z[k, 0], Z[k, 1], Z[k, 2], Z[k, 3] = (np_myfloat(id_x), np_myfloat(id_y),
+                                                  current_min, np_myfloat(nx + ny))
         else:
-            Z[k, 0], Z[k, 1], Z[k, 2], Z[k, 3] = (np.double(id_y), np.double(id_x),
-                                                  current_min, np.double(nx + ny))
+            Z[k, 0], Z[k, 1], Z[k, 2], Z[k, 3] = (np_myfloat(id_y), np_myfloat(id_x),
+                                                  current_min, np_myfloat(nx + ny))
 
         id_map[x] = -1  # cluster x will be dropped
         id_map[y] = n + k  # cluster y will be replaced with the new cluster
@@ -743,7 +745,7 @@ def linkage(dists, Z, n, method):
             if id_i == -1 or id_i == n + k:
                 continue
 
-            ni = 1 if id_i < n else myint(Z[id_i - n, 3])
+            ni = 1 if id_i < n else nb_myint(Z[id_i - n, 3])
             # Numba was not able to NJIT if I assign a function to a variable before
             if method == 0:
                 D[condensed_index(n, i, y)] = hdu._single(
@@ -781,10 +783,10 @@ def linkage(dists, Z, n, method):
                     D[condensed_index(n, i, y)],
                     current_min, nx, ny, ni)
             if i < x:
-                D[condensed_index(n, i, x)] = np.double(np.inf)
+                D[condensed_index(n, i, x)] = np_myfloat(np.inf)
 
 
-@nb.njit(nb.void(myfloat[:, :], myint[:], myint))
+@nb.njit
 def prelist(Z, members, n):
     """
     Perform a pre-order traversal on the linkage tree and get a list of ids
@@ -800,9 +802,9 @@ def prelist(Z, members, n):
         The number of observations.
     """
 
-    curr_node = np.empty(n, dtype=myint)
+    curr_node = np.empty(n, dtype=nb_myint)
 
-    visited_size = np.int((((n * 2) - 1) >> 3) + 1)
+    visited_size = np_myint((((n * 2) - 1) >> 3) + 1)
 
     visited = np.zeros(visited_size, dtype=np.uint8)
 
@@ -812,7 +814,7 @@ def prelist(Z, members, n):
     while k >= 0:
         root = curr_node[k] - n
 
-        i_lc = np.int(Z[root, 0])
+        i_lc = np_myint(Z[root, 0])
         if not is_visited(visited, i_lc):
             set_visited(visited, i_lc)
             if i_lc >= n:
@@ -823,7 +825,7 @@ def prelist(Z, members, n):
                 members[mem_idx] = i_lc
                 mem_idx += 1
 
-        i_rc = np.int(Z[root, 1])
+        i_rc = np_myint(Z[root, 1])
         if not is_visited(visited, i_rc):
             set_visited(visited, i_rc)
             if i_rc >= n:
@@ -836,10 +838,7 @@ def prelist(Z, members, n):
 
         k -= 1
 
-
-fpr_sig = [nb.void(myfloat[:, :], myfloat[:], myint[:], myint),
-           nb.void(nb.float[:, :], nb.float[:], myint[:], myint)]
-@nb.njit(fpr_sig)
+@nb.njit
 def from_pointer_representation(Z, Lambda, Pi, n):
     """
     Generate a linkage matrix from its pointer representation.
@@ -879,9 +878,9 @@ def from_pointer_representation(Z, Lambda, Pi, n):
 
     calculate_cluster_sizes(Z, Z[:, 3], n)
 
-slink_sig = [nb.void(myfloat[:], myfloat[:, :], myint),
-             nb.void(nb.uint8[:], nb.float[:,:], myint)]
-@nb.njit(slink_sig)
+dists_dtype = np.float32
+
+@nb.njit
 def slink(dists, Z, n):
     """
     The SLINK algorithm. Single linkage in O(n^2) time complexity.
@@ -900,9 +899,10 @@ def slink(dists, Z, n):
     R. Sibson, "SLINK: An optimally efficient algorithm for the single-link
     cluster method", The Computer Journal 1973 16: 30-34.
     """
-    M = np.empty(n, dtype=dists.dtype)
-    Lambda = np.empty(n, dtype=np.double)
-    Pi = np.empty(n, dtype=myint)
+
+    M = np.empty(n, dtype=dists_dtype)
+    Lambda = np.empty(n, dtype=dists_dtype)
+    Pi = np.empty(n, dtype=nb_myint)
 
     Pi[0] = 0
     Lambda[0] = np.inf
